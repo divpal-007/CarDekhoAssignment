@@ -1,0 +1,49 @@
+services:
+
+  # ────────────────────────────────────────────
+  # Spring Boot Backend
+  # ────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: starter-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"       # Expose directly for H2 console / API testing
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      # Override any property via env vars (Spring's relaxed binding)
+      # Swap H2 for a real DB by setting these and adding a DB service below:
+      # SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/starterdb
+      # SPRING_DATASOURCE_USERNAME: starter
+      # SPRING_DATASOURCE_PASSWORD: secret
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s   # Give Spring Boot time to start before first check
+    networks:
+      - starter-net
+
+  # ────────────────────────────────────────────
+  # React Frontend (Nginx)
+  # ────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: starter-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"           # App available at http://localhost
+    depends_on:
+      backend:
+        condition: service_healthy   # Don't start Nginx until Spring Boot is up
+    networks:
+      - starter-net
+
+networks:
+  starter-net:
+    driver: bridge
